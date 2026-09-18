@@ -67,6 +67,7 @@
       border-radius: 18px;
       line-height: 1.4;
       overflow-wrap: anywhere;
+      white-space: pre-wrap;
     }
 
     .jarvis { background: var(--assistant); align-self: flex-start; }
@@ -140,68 +141,91 @@
   </main>
 
   <script>
-    const form = document.getElementById("form");
-    const input = document.getElementById("input");
-    const chat = document.getElementById("chat");
-    const sendButton = document.getElementById("send-button");
-    const historyKey = "jarvis-chat-history";
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    const chat = document.getElementById('chat');
+    const sendButton = document.getElementById('send-button');
+    const historyKey = 'jarvis-chat-history';
 
     function addMessage(text, type, save = true) {
-      const message = document.createElement("div");
+      const message = document.createElement('div');
       message.className = `message ${type}`;
       message.textContent = text;
       chat.appendChild(message);
       chat.scrollTop = chat.scrollHeight;
 
       if (save) {
-        const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+        const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
         history.push({ text, type });
         localStorage.setItem(historyKey, JSON.stringify(history.slice(-50)));
       }
     }
 
     function restoreHistory() {
-      const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+      const history = JSON.parse(localStorage.getItem(historyKey) || '[]');
       if (!history.length) return;
       chat.replaceChildren();
       history.forEach(({ text, type }) => addMessage(text, type, false));
     }
 
     function addTypingIndicator() {
-      const indicator = document.createElement("div");
-      indicator.className = "message jarvis typing";
-      indicator.id = "typing-indicator";
-      indicator.textContent = "Jarvis is thinking…";
+      const indicator = document.createElement('div');
+      indicator.className = 'message jarvis typing';
+      indicator.id = 'typing-indicator';
+      indicator.textContent = 'Jarvis is thinking…';
       chat.appendChild(indicator);
       chat.scrollTop = chat.scrollHeight;
     }
 
     function removeTypingIndicator() {
-      document.getElementById("typing-indicator")?.remove();
+      const indicator = document.getElementById('typing-indicator');
+      if (indicator) indicator.remove();
+    }
+
+    async function sendMessageToJarvis(message) {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ message })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Something went wrong.');
+      }
+
+      return data.reply;
     }
 
     restoreHistory();
     input.focus();
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const text = input.value.trim();
       if (!text) return;
 
-      addMessage(text, "user");
-      input.value = "";
+      addMessage(text, 'user');
+      input.value = '';
       input.disabled = true;
       sendButton.disabled = true;
       addTypingIndicator();
 
-      // Replace this simulated response with a request to your secure backend.
-      setTimeout(() => {
+      try {
+        const reply = await sendMessageToJarvis(text);
         removeTypingIndicator();
-        addMessage(`I’m still being built, but I received: “${text}”.`, "jarvis");
+        addMessage(reply, 'jarvis');
+      } catch (error) {
+        removeTypingIndicator();
+        addMessage(error.message || 'Failed to get a response.', 'jarvis');
+      } finally {
         input.disabled = false;
         sendButton.disabled = false;
         input.focus();
-      }, 500);
+      }
     });
   </script>
 </body>
