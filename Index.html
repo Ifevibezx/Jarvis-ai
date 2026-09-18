@@ -1,37 +1,123 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jarvis</title>
+  <meta name="description" content="Jarvis, a personal AI assistant interface." />
+  <title>Jarvis AI</title>
   <style>
+    :root {
+      color-scheme: dark;
+      --background: #07111f;
+      --panel: #0d1d31;
+      --assistant: #132a46;
+      --user: #0a7ea4;
+      --accent: #58d6ff;
+      --text-muted: #a9bfd2;
+    }
+
     * { box-sizing: border-box; }
+
     body {
-      margin: 0; min-height: 100vh; font-family: Arial, sans-serif;
-      background: #07111f; color: #fff; display: grid; place-items: center;
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle at top, #102945, var(--background) 55%);
+      color: #fff;
     }
+
     .app {
-      width: min(700px, 100%); min-height: 100vh; padding: 24px;
-      display: flex; flex-direction: column;
+      width: min(700px, 100%);
+      min-height: 100vh;
+      margin: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
     }
-    header { display: flex; justify-content: space-between; align-items: center; }
-    h1 { margin: 0; color: #58d6ff; }
-    .badge { background: #123c35; color: #7fffd4; padding: 8px 12px; border-radius: 20px; }
-    #chat { flex: 1; padding: 28px 0; display: flex; flex-direction: column; gap: 14px; }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1 { margin: 0; color: var(--accent); letter-spacing: 0.08em; }
+
+    .badge {
+      background: #123c35;
+      color: #7fffd4;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 0.875rem;
+    }
+
+    #chat {
+      flex: 1;
+      padding: 28px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+
     .message {
-      max-width: 82%; padding: 14px 16px; border-radius: 18px; line-height: 1.4;
+      max-width: 82%;
+      padding: 14px 16px;
+      border-radius: 18px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
     }
-    .jarvis { background: #132a46; align-self: flex-start; }
-    .user { background: #0a7ea4; align-self: flex-end; }
+
+    .jarvis { background: var(--assistant); align-self: flex-start; }
+    .user { background: var(--user); align-self: flex-end; }
+    .typing { color: var(--text-muted); font-style: italic; }
+
     form { display: flex; gap: 10px; padding-top: 12px; }
-    input {
-      flex: 1; border: 0; border-radius: 24px; padding: 16px;
-      font-size: 16px; outline: none;
+
+    label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
+
+    input {
+      min-width: 0;
+      flex: 1;
+      border: 1px solid #24435f;
+      border-radius: 24px;
+      padding: 16px;
+      font-size: 16px;
+      outline: none;
+      background: var(--panel);
+      color: #fff;
+    }
+
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #58d6ff33; }
+
     button {
-      border: 0; border-radius: 24px; padding: 0 20px;
-      background: #58d6ff; color: #00131d; font-weight: bold; font-size: 16px;
+      border: 0;
+      border-radius: 24px;
+      padding: 0 20px;
+      background: var(--accent);
+      color: #00131d;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    button:disabled { opacity: 0.6; cursor: wait; }
+
+    @media (max-width: 420px) {
+      .app { padding: 18px; }
+      .message { max-width: 92%; }
+      button { padding: 0 16px; }
     }
   </style>
 </head>
@@ -39,18 +125,17 @@
   <main class="app">
     <header>
       <h1>JARVIS</h1>
-      <span class="badge">Online</span>
+      <span class="badge" aria-label="Jarvis status">Online</span>
     </header>
 
-    <section id="chat">
-      <div class="message jarvis">
-        Hello. I’m Jarvis, your personal assistant. How can I help today?
-      </div>
+    <section id="chat" aria-live="polite" aria-label="Chat messages">
+      <div class="message jarvis">Hello. I’m Jarvis, your personal assistant. How can I help today?</div>
     </section>
 
     <form id="form">
-      <input id="input" placeholder="Ask Jarvis anything..." autocomplete="off" />
-      <button type="submit">Send</button>
+      <label for="input">Message Jarvis</label>
+      <input id="input" placeholder="Ask Jarvis anything..." autocomplete="off" maxlength="2000" required />
+      <button id="send-button" type="submit">Send</button>
     </form>
   </main>
 
@@ -58,22 +143,66 @@
     const form = document.getElementById("form");
     const input = document.getElementById("input");
     const chat = document.getElementById("chat");
+    const sendButton = document.getElementById("send-button");
+    const historyKey = "jarvis-chat-history";
+
+    function addMessage(text, type, save = true) {
+      const message = document.createElement("div");
+      message.className = `message ${type}`;
+      message.textContent = text;
+      chat.appendChild(message);
+      chat.scrollTop = chat.scrollHeight;
+
+      if (save) {
+        const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+        history.push({ text, type });
+        localStorage.setItem(historyKey, JSON.stringify(history.slice(-50)));
+      }
+    }
+
+    function restoreHistory() {
+      const history = JSON.parse(localStorage.getItem(historyKey) || "[]");
+      if (!history.length) return;
+      chat.replaceChildren();
+      history.forEach(({ text, type }) => addMessage(text, type, false));
+    }
+
+    function addTypingIndicator() {
+      const indicator = document.createElement("div");
+      indicator.className = "message jarvis typing";
+      indicator.id = "typing-indicator";
+      indicator.textContent = "Jarvis is thinking…";
+      chat.appendChild(indicator);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+      document.getElementById("typing-indicator")?.remove();
+    }
+
+    restoreHistory();
+    input.focus();
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const text = input.value.trim();
       if (!text) return;
 
-      chat.innerHTML += `<div class="message user">${text}</div>`;
+      addMessage(text, "user");
       input.value = "";
+      input.disabled = true;
+      sendButton.disabled = true;
+      addTypingIndicator();
 
+      // Replace this simulated response with a request to your secure backend.
       setTimeout(() => {
-        chat.innerHTML += `<div class="message jarvis">
-          I’m still being built, but I received: “${text}”.
-        </div>`;
-        window.scrollTo(0, document.body.scrollHeight);
+        removeTypingIndicator();
+        addMessage(`I’m still being built, but I received: “${text}”.`, "jarvis");
+        input.disabled = false;
+        sendButton.disabled = false;
+        input.focus();
       }, 500);
     });
   </script>
 </body>
-</html> 
+</html>
